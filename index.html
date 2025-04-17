@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Multi-Conditional Switch with Weekly Parallel Step</title>
+  <link rel="stylesheet" href="https://nocode-js.github.io/sequential-workflow-designer/examples/assets/common.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sequential-workflow-designer@0.28.0/css/designer.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sequential-workflow-designer@0.28.0/css/designer-light.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sequential-workflow-designer@0.28.0/css/designer-dark.css">
+  <style>
+    #jsonOutput {
+      margin: 20px;
+      padding: 10px;
+      background-color: #f4f4f4;
+      border: 1px solid #ccc;
+      display: none;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <header class="title-bar">
+    <div class="column">
+      <h1>🌵 Multi-Conditional Switch Example with Weekly Parallel Step</h1>
+    </div>
+    <div class="column text-end flex-1">
+      <a href="https://github.com/nocode-js/sequential-workflow-designer" target="_blank">GitHub</a>
+      <button id="exportTextButton">Export to Text</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <div id="designer" style="height: 500px;"></div>
+    <h4>Result</h4>
+    <pre id="result"></pre>
+    <div id="jsonOutput"></div>
+  </div>
+
+  <!-- Library utama -->
+  <script src="https://cdn.jsdelivr.net/npm/sequential-workflow-designer@0.28.0/dist/index.umd.js"></script>
+  <script>
+    /* global window, document, sequentialWorkflowDesigner */
+
+    function createWriteStep(value) {
+      return {
+        id: sequentialWorkflowDesigner.Uid.next(),
+        componentType: 'task',
+        type: 'write',
+        name: `Write ${value}`,
+        properties: {}
+      };
+    }
+	function timeStepEditorProvider(step, editorContext) {
+      const root = document.createElement('div');
+      appendTitle(root, 'Time step');
+      appendNameEditor(root, step, editorContext);
+      return root;
+    }
+
+    function createTimeComponent() {
+      return {
+        id: sequentialWorkflowDesigner.Uid.next(),
+        componentType: 'task',
+        type: 'time',
+        name: 'Get Current Time',
+        properties: {}
+      };
+    }
+
+    function createIfStep(name, trueSteps, falseSteps) {
+      return {
+        id: sequentialWorkflowDesigner.Uid.next(),
+        componentType: 'switch',
+        type: 'if',
+        name,
+        properties: {
+          condition: "currentHour >= 8 && currentHour < 10"
+        },
+        branches: {
+          true: trueSteps || [],
+          false: falseSteps || []
+        }
+      };
+    }
+
+    function createWeeklyParallelStep(name) {
+	// Create parallel step for weekly days (Su, Mo, Tu, ...), with no conditions needed
+	const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+	const branches = {};
+
+	daysOfWeek.forEach(day => {
+		branches[day] = [createWriteStep(`Task for ${day}`)];
+	});
+
+	return {
+		id: sequentialWorkflowDesigner.Uid.next(),
+		componentType: 'switch',
+		type: 'parallel',
+		name,
+		properties: {
+		// No conditions are set, the condition is always true for every day
+		conditions: {}  // Empty or omitted means it always evaluates to true
+		},
+		branches: branches
+	};
+	}
+
+
+    function createButton(text, clickHandler) {
+      const button = document.createElement('button');
+      button.innerText = text;
+      button.addEventListener('click', clickHandler, false);
+      return button;
+    }
+
+    function appendTitle(root, title) {
+      const h2 = document.createElement('h2');
+      h2.innerText = title;
+      root.appendChild(h2);
+    }
+
+    function appendPropertyTitle(root, title) {
+      const h3 = document.createElement('h3');
+      h3.innerText = title;
+      root.appendChild(h3);
+    }
+
+    function appendNameEditor(root, step, editorContext) {
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = step.name;
+      input.addEventListener(
+        'input',
+        () => {
+          step.name = input.value;
+          editorContext.notifyNameChanged();
+        },
+        false
+      );
+
+      appendPropertyTitle(root, 'Name');
+      root.appendChild(input);
+    }
+
+    function appendConditionEditor(root, condition, onChange) {
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = condition || '';
+      input.addEventListener('input', () => {
+        onChange(input.value);
+      }, false);
+
+      root.appendChild(input);
+    }
+
+	function parallelStepEditorProvider(step, editorContext) {
+  const root = document.createElement('div');
+  appendTitle(root, 'Weekly Parallel step');
+  appendNameEditor(root, step, editorContext);
+
+  // Render each day's branch (Su, Mo, Tu, ...)
+  Object.keys(step.branches).forEach(day => {
+    const branchDiv = document.createElement('div');
+    branchDiv.classList.add('switch-branch');
+
+    const title = document.createElement('h4');
+    title.innerText = day;
+    branchDiv.appendChild(title);
+
+    // No condition editor is needed since condition is always true
+    root.appendChild(branchDiv);
+  });
+
+  return root;
+}
+
+
+    function ifStepEditorProvider(step, editorContext) {
+      const root = document.createElement('div');
+      appendTitle(root, 'If Step');
+      appendNameEditor(root, step, editorContext);
+
+      appendPropertyTitle(root, 'Condition');
+      appendConditionEditor(root, step.properties.condition, value => {
+        step.properties.condition = value;
+        editorContext.notifyPropertiesChanged();
+      });
+
+      return root;
+    }
+
+    function writeStepEditorProvider(step, editorContext) {
+      const root = document.createElement('div');
+      appendTitle(root, 'Write Step');
+      appendNameEditor(root, step, editorContext);
+      return root;
+    }
+
+    function rootEditorProvider() {
+      const root = document.createElement('div');
+      appendTitle(root, `Multi-Conditional Switch`);
+      const description = document.createElement('p');
+      description.innerText = 'This example demonstrates how to create a weekly parallel step.';
+      root.appendChild(description);
+      return root;
+    }
+
+    function stepEditorProvider(step, editorContext) {
+      switch (step.type) {
+        case 'parallel':
+          return parallelStepEditorProvider(step, editorContext);
+        case 'if':
+          return ifStepEditorProvider(step, editorContext);
+        case 'write':
+          return writeStepEditorProvider(step, editorContext);
+		  case 'time':
+          return timeStepEditorProvider(step, editorContext);
+        default:
+          throw new Error(`Unknown step type: ${step.type}`);
+      }
+    }
+
+    function createTimeComponent() {
+      return {
+        id: sequentialWorkflowDesigner.Uid.next(),
+        componentType: 'task',
+        type: 'time',
+        name: 'Get Current Time',
+        properties: {}
+      };
+    }
+
+    function load() {
+      const definition = {
+        sequence: [
+          createTimeComponent(),
+          createIfStep('Check Open Hours', [createWriteStep('Open')], [createWriteStep('Closed')])
+        ],
+        properties: {}
+      };
+
+      const configuration = {
+        toolbox: {
+          groups: [
+            {
+              name: 'Steps',
+              steps: [createWriteStep('_'), createIfStep('If'), createWeeklyParallelStep('Weekly'),createTimeComponent()]
+            }
+          ]
+        },
+        steps: {
+          iconUrlProvider: componentType => {
+            return componentType === 'switch' ? './assets/icon-if.svg' : './assets/icon-task.svg';
+          }
+        },
+        editors: {
+          rootEditorProvider,
+          stepEditorProvider
+        },
+        controlBar: true
+      };
+
+      const placeholder = document.getElementById('designer');
+      window.designer = sequentialWorkflowDesigner.Designer.create(placeholder, definition, configuration);
+    }
+
+
+	function exportToText() {
+  const definition = designer.getDefinition();
+
+  const sequence = definition.sequence.map(step => {
+    switch (step.type) {
+      case 'time':
+        return "Start: Get Current Time";
+
+      case 'if':
+        const condition = step.properties.condition;
+        const trueSteps = step.branches.true.map(subStep => `    - ${subStep.name}`);
+        const falseSteps = step.branches.false.map(subStep => `    - ${subStep.name}`);
+        return `If ${condition}:\n  True:\n${trueSteps.join('\n')}\n  False:\n${falseSteps.join('\n')}`;
+
+      case 'write':
+        return `Write: ${step.name}`;
+
+      case 'parallel':
+        const branches = Object.entries(step.branches).map(
+          ([day, steps]) => {
+            const branchSteps = steps.map(s => `    - ${s.name}`).join('\n');
+            return `  ${day}:\n${branchSteps}`;
+          }
+        ).join('\n');
+        return `Parallel Step: ${step.name}\n${branches}`;
+
+      default:
+        return `Unknown step type: ${step.type}`;
+    }
+  }).join('\n\n');
+
+  const resultText = `Workflow Steps:\n${sequence}`;
+  const resultDiv = document.getElementById('jsonOutput');
+  resultDiv.style.display = 'block';
+  resultDiv.textContent = resultText;
+}
+
+
+    window.addEventListener('load', load, false);
+
+    document.getElementById('exportTextButton').addEventListener('click', exportToText);
+  </script>
+</body>
+</html>
